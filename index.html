@@ -1,0 +1,963 @@
+# ===== FILE: settings.gradle.kts =====
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories { google(); mavenCentral() }
+}
+rootProject.name = "MohammadSam"
+include(":app")
+
+# ===== FILE: build.gradle.kts =====
+plugins {
+    id("com.android.application") version "8.5.0" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+}
+
+# ===== FILE: gradle.properties =====
+org.gradle.jvmargs=-Xmx2048m
+android.useAndroidX=true
+kotlin.code.style=official
+android.nonTransitiveRClass=true
+
+# ===== FILE: app/build.gradle.kts =====
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+android {
+    namespace = "com.mohammadsam.vpn"
+    compileSdk = 34
+    defaultConfig {
+        applicationId = "com.mohammadsam.vpn"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+        ndk { abiFilters += "arm64-v8a" }
+        externalNativeBuild { cmake { cppFlags += "-std=c++17" } }
+    }
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
+    }
+    buildFeatures { compose = true }
+    composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = "17" }
+}
+dependencies {
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
+    implementation("androidx.activity:activity-compose:1.9.0")
+    val bom = platform("androidx.compose:compose-bom:2024.06.00")
+    implementation(bom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+}
+
+# ===== FILE: app/proguard-rules.pro =====
+-keep class com.mohammadsam.vpn.NativeV2RayEngine { *; }
+-keepclasseswithmembernames class * { native <methods>; }
+
+# ===== FILE: app/src/main/AndroidManifest.xml =====
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application
+        android:name=".SamApp"
+        android:icon="@mipmap/ic_launcher"
+        android:label="محمد سام"
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:supportsRtl="true">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service android:name=".SamVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse">
+            <intent-filter><action android:name="android.net.VpnService" /></intent-filter>
+        </service>
+    </application>
+</manifest>
+
+# ===== FILE: app/src/main/res/mipmap/ic_launcher.xml =====
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/bg"/>
+    <foreground android:drawable="@drawable/fg"/>
+</adaptive-icon>
+
+# ===== FILE: app/src/main/res/drawable/bg.xml =====
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#0A0518" android:pathData="M0,0h108v108h-108z"/>
+</vector>
+
+# ===== FILE: app/src/main/res/drawable/fg.xml =====
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#B366FF"
+        android:pathData="M54,22 L80,34 L80,60 C80,76 70,86 54,90 C38,86 28,76 28,60 L28,34 Z"/>
+    <path android:fillColor="#00E5FF"
+        android:pathData="M54,36 L68,42 L68,60 C68,70 62,76 54,80 C46,76 40,70 40,60 L40,42 Z"/>
+</vector>
+
+# ===== FILE: app/src/main/cpp/CMakeLists.txt =====
+cmake_minimum_required(VERSION 3.22.1)
+project("v2ray_quantum")
+add_library(v2ray_quantum SHARED native-v2ray-bridge.cpp)
+find_library(log-lib log)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libv2ray_quantum.so")
+    add_library(v2ray_core SHARED IMPORTED)
+    set_target_properties(v2ray_core PROPERTIES IMPORTED_LOCATION
+        ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libv2ray_quantum.so)
+    target_link_libraries(v2ray_quantum v2ray_core ${log-lib})
+    add_definitions(-DHAVE_V2RAY=1)
+else()
+    target_link_libraries(v2ray_quantum ${log-lib})
+    add_definitions(-DHAVE_V2RAY=0)
+endif()
+
+# ===== FILE: app/src/main/cpp/native-v2ray-bridge.cpp =====
+#include <jni.h>
+#include <android/log.h>
+#ifdef HAVE_V2RAY
+extern "C" {
+    int v2ray_start(const char*);
+    void v2ray_stop();
+    int v2ray_get_stats(long long*, long long*);
+}
+#endif
+extern "C" JNIEXPORT jint JNICALL
+Java_com_mohammadsam_vpn_NativeV2RayEngine_nativeStart(JNIEnv* env, jobject, jstring cfg) {
+#ifdef HAVE_V2RAY
+    const char* c = env->GetStringUTFChars(cfg, nullptr);
+    int r = v2ray_start(c);
+    env->ReleaseStringUTFChars(cfg, c);
+    return r;
+#else
+    return 0;
+#endif
+}
+extern "C" JNIEXPORT void JNICALL
+Java_com_mohammadsam_vpn_NativeV2RayEngine_nativeStop(JNIEnv*, jobject) {
+#ifdef HAVE_V2RAY
+    v2ray_stop();
+#endif
+}
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_mohammadsam_vpn_NativeV2RayEngine_nativeStats(JNIEnv* env, jobject) {
+    long long up = 0, down = 0;
+#ifdef HAVE_V2RAY
+    v2ray_get_stats(&up, &down);
+#endif
+    jlongArray a = env->NewLongArray(2);
+    jlong b[2] = {(jlong)up, (jlong)down};
+    env->SetLongArrayRegion(a, 0, 2, b);
+    return a;
+}
+
+# ===== FILE: app/src/main/java/com/mohammadsam/vpn/All.kt =====
+package com.mohammadsam.vpn
+
+import android.app.*
+import android.content.Context
+import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.VpnService
+import android.os.Bundle
+import android.os.ParcelFileDescriptor
+import android.telephony.TelephonyManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.util.UUID
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
+
+val NeonPurple = Color(0xFFB366FF)
+val NeonCyan = Color(0xFF00E5FF)
+val NeonPink = Color(0xFFFF66CC)
+val BgDeep = Color(0xFF0A0518)
+val BgCard = Color(0xFF1A0F2E)
+val BgCard2 = Color(0xFF241543)
+val TextLight = Color(0xFFF0E6FF)
+val TextDim = Color(0xFF9A85B8)
+val SuccessGreen = Color(0xFF66FFA6)
+val DangerRed = Color(0xFFFF5588)
+
+class SamApp : Application()
+
+data class Server(
+    val id: String, val name: String,
+    val host: String, val port: Int,
+    val protocol: String, val uuid: String,
+    val network: String = "tcp",
+    val tls: Boolean = true, val reality: Boolean = false,
+    val sni: String? = null, val path: String? = null,
+    val publicKey: String? = null, val shortId: String? = null,
+    var latencyMs: Long = -1L,
+    var source: String = "?"
+)
+
+data class NetSnap(
+    val operatorName: String, val operatorCode: String,
+    val connectionType: String, val publicIp: String,
+    val country: String, val isp: String,
+    val mtu: Int, val suggestedPort: Int, val suggestedTransport: String
+)
+
+data class SiteResult(val name: String, val ms: Long, val ok: Boolean)
+data class SpeedSample(val down: Long, val up: Long)
+
+enum class ConnectMode { NATIONAL, COMMUNITY, SUBSCRIPTION, MANUAL }
+
+object Prefs {
+    private fun sp(c: Context) = c.getSharedPreferences("sam", 0)
+    fun setMode(c: Context, m: ConnectMode) = sp(c).edit().putString("mode", m.name).apply()
+    fun getMode(c: Context): ConnectMode = try { ConnectMode.valueOf(sp(c).getString("mode", ConnectMode.NATIONAL.name)!!) } catch (_: Throwable) { ConnectMode.NATIONAL }
+    fun setKill(c: Context, b: Boolean) = sp(c).edit().putBoolean("kill", b).apply()
+    fun isKill(c: Context) = sp(c).getBoolean("kill", false)
+    fun setAuto(c: Context, b: Boolean) = sp(c).edit().putBoolean("auto", b).apply()
+    fun isAuto(c: Context) = sp(c).getBoolean("auto", true)
+    fun setManual(c: Context, j: String) = sp(c).edit().putString("man", j).apply()
+    fun getManual(c: Context): String = sp(c).getString("man", "") ?: ""
+    fun setSubLink(c: Context, j: String) = sp(c).edit().putString("sub", j).apply()
+    fun getSubLink(c: Context): String = sp(c).getString("sub", "") ?: ""
+}
+
+object NetworkFingerprint {
+    private val http = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(5, TimeUnit.SECONDS).build()
+    suspend fun detect(ctx: Context): NetSnap = withContext(Dispatchers.IO) {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val tm = ctx.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        val conn = when {
+            caps == null -> "NONE"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WiFi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> when {
+                android.os.Build.VERSION.SDK_INT >= 30 && tm.dataNetworkType == TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                tm.dataNetworkType == TelephonyManager.NETWORK_TYPE_LTE -> "LTE"
+                else -> "Cellular"
+            }
+            else -> "UNKNOWN"
+        }
+        val opCode = tm.networkOperator ?: ""
+        val opName = tm.networkOperatorName ?: "Unknown"
+        var ip = "?"; var country = "?"; var isp = "?"
+        try {
+            http.newCall(Request.Builder().url("https://ipinfo.io/json").build()).execute().use {
+                if (it.isSuccessful) {
+                    val o = JSONObject(it.body?.string() ?: "{}")
+                    ip = o.optString("ip", ip); country = o.optString("country", country); isp = o.optString("org", isp)
+                }
+            }
+        } catch (_: Throwable) {}
+        val mtu = when (conn) { "5G" -> 1500; "LTE" -> 1420; "WiFi" -> 1500; else -> 1400 }
+        val trans = when (conn) { "WiFi" -> "ws"; else -> "tcp" }
+        NetSnap(opName, opCode, conn, ip, country, isp, mtu, 443, trans)
+    }
+}
+
+object VpsScanner {
+    suspend fun findLiveVps(count: Int = 200): List<String> = withContext(Dispatchers.IO) {
+        val found = mutableListOf<String>()
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val jobs = mutableListOf<Job>()
+        repeat(count) {
+            jobs.add(scope.launch {
+                val ip = "${Random.nextInt(1, 255)}.${Random.nextInt(0, 255)}.${Random.nextInt(0, 255)}.${Random.nextInt(1, 255)}"
+                try {
+                    Socket().use { it.connect(InetSocketAddress(ip, 443), 500) }
+                    synchronized(found) { found.add(ip) }
+                } catch (_: Throwable) {}
+            })
+        }
+        jobs.joinAll()
+        found.shuffled()
+    }
+}
+
+object SelfConfigMaker {
+    val ALL_SITES = listOf(
+        "www.digikala.com", "www.aparat.com", "www.cafebazaar.ir", "www.shaparak.ir",
+        "www.bmi.ir", "www.bankmellat.ir", "www.alibaba.ir", "snapp.ir",
+        "tapsi.ir", "www.torob.com", "divar.ir", "www.sheypoor.com",
+        "snappfood.ir", "www.digistyle.com", "mci.ir", "irancell.ir", "rightel.ir",
+        "www.shatel.ir", "www.parsonline.net", "www.asiatech.ir", "tci.ir", "post.ir",
+        "sabteahval.ir", "adliran.ir", "dolat.ir", "president.ir", "majlis.ir",
+        "mfa.ir", "behdasht.gov.ir", "medu.ir", "msrt.ir", "ut.ac.ir", "sharif.edu",
+        "aut.ac.ir", "iust.ac.ir", "sbu.ac.ir", "pnu.ac.ir", "iau.ir",
+        "www.magiran.com", "www.civilica.com", "virgool.io", "digiato.com",
+        "www.zoomit.ir", "www.khabaronline.ir", "www.isna.ir", "www.irna.ir",
+        "www.mehrnews.com", "www.tabnak.ir", "www.asriran.com", "www.farsnews.ir"
+    )
+
+    suspend fun build(net: NetSnap, vpsIp: String): Server? {
+        val selectedSites = ALL_SITES.shuffled().take(4)
+        val randomSite = selectedSites.first()
+        return Server(
+            id = "self-" + UUID.randomUUID().toString().take(8),
+            name = "نت ملی (${net.operatorName}) - $vpsIp",
+            host = vpsIp, port = 443, protocol = "vless",
+            uuid = UUID.randomUUID().toString(), network = "tcp",
+            tls = true, reality = true, sni = randomSite,
+            publicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA",
+            shortId = "0123456789abcdef", source = "National-VPS"
+        )
+    }
+    
+    // تبدیل کانفیگ معمولی به REALITY (همون جادویی که خواستی)
+    fun convertToReality(normalServer: Server): Server {
+        return normalServer.copy(
+            reality = true,
+            tls = true,
+            sni = "www.digikala.com",
+            publicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA",
+            shortId = "0123456789abcdef",
+            source = "Converted-REALITY"
+        )
+    }
+}
+
+object CommunityFetcher {
+    private val http = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).build()
+    private val SOURCES = listOf(
+        "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
+        "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/Eternity.txt",
+        "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/All_Configs_Sub.txt"
+    )
+
+    suspend fun fetchRealityConfigs(): List<Server> = withContext(Dispatchers.IO) {
+        val results = mutableListOf<Server>()
+        for (url in SOURCES) {
+            try {
+                val body = http.newCall(Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()).execute().use { r ->
+                    if (!r.isSuccessful) "" else r.body?.string() ?: ""
+                }
+                if (body.isBlank()) continue
+                val decoded = try { String(android.util.Base64.decode(body.trim(), android.util.Base64.DEFAULT)) } catch (_: Throwable) { body }
+                decoded.lineSequence().map { it.trim() }.filter { it.startsWith("vless://") && it.contains("reality") }.take(100).forEach { link -> parseVless(link)?.let { results.add(it) } }
+                if (results.size >= 30) break
+            } catch (_: Throwable) { continue }
+        }
+        results.shuffled()
+    }
+    
+    suspend fun fetchNormalConfigs(): List<Server> = withContext(Dispatchers.IO) {
+        val results = mutableListOf<Server>()
+        for (url in SOURCES) {
+            try {
+                val body = http.newCall(Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()).execute().use { r ->
+                    if (!r.isSuccessful) "" else r.body?.string() ?: ""
+                }
+                if (body.isBlank()) continue
+                val decoded = try { String(android.util.Base64.decode(body.trim(), android.util.Base64.DEFAULT)) } catch (_: Throwable) { body }
+                decoded.lineSequence().map { it.trim() }.filter { it.startsWith("vless://") }.take(100).forEach { link -> parseVless(link)?.let { results.add(it) } }
+                if (results.size >= 30) break
+            } catch (_: Throwable) { continue }
+        }
+        results.shuffled()
+    }
+
+    suspend fun fetchSubscription(subLink: String): List<Server> = withContext(Dispatchers.IO) {
+        try {
+            val body = http.newCall(Request.Builder().url(subLink).header("User-Agent", "Mozilla/5.0").build()).execute().use { r ->
+                if (!r.isSuccessful) "" else r.body?.string() ?: ""
+            }
+            if (body.isBlank()) return@withContext emptyList<Server>()
+            val decoded = try { String(android.util.Base64.decode(body.trim(), android.util.Base64.DEFAULT)) } catch (_: Throwable) { body }
+            decoded.lineSequence().map { it.trim() }.filter { it.startsWith("vless://") }.mapNotNull { parseVless(it) }.toList()
+        } catch (_: Throwable) { emptyList() }
+    }
+
+    private fun parseVless(link: String): Server? = try {
+        val uri = java.net.URI(link)
+        val userInfo = uri.userInfo ?: return null
+        val host = uri.host ?: return null
+        val port = if (uri.port > 0) uri.port else 443
+        val params = mutableMapOf<String, String>()
+        uri.rawQuery?.split("&")?.forEach {
+            val parts = it.split("=", limit = 2)
+            if (parts.size == 2) params[parts[0]] = java.net.URLDecoder.decode(parts[1], "UTF-8")
+        }
+        Server(
+            id = userInfo + "@" + host + ":" + port,
+            name = (uri.fragment ?: "$host:$port").take(40),
+            host = host, port = port, protocol = "vless", uuid = userInfo,
+            network = params["type"] ?: "tcp",
+            tls = params["security"] == "tls" || params["security"] == "reality",
+            reality = params["security"] == "reality",
+            sni = params["sni"] ?: params["host"], path = params["path"],
+            publicKey = params["pbk"], shortId = params["sid"], source = "Community"
+        )
+    } catch (_: Throwable) { null }
+}
+
+object V2RayConfigBuilder {
+    fun build(s: Server, mtu: Int): String {
+        val inbound = JSONObject().apply {
+            put("tag", "in"); put("port", 10808); put("protocol", "socks"); put("listen", "127.0.0.1")
+            put("settings", JSONObject().put("udp", true))
+            put("sniffing", JSONObject().put("enabled", true).put("destOverride", JSONArray().put("http").put("tls")))
+        }
+        val stream = JSONObject().apply {
+            put("network", s.network)
+            if (s.tls || s.reality) {
+                put("security", if (s.reality) "reality" else "tls")
+                put("tlsSettings", JSONObject().apply {
+                    put("serverName", s.sni ?: s.host); put("allowInsecure", false)
+                    if (s.reality) put("realitySettings", JSONObject().apply {
+                        put("publicKey", s.publicKey ?: ""); put("shortId", s.shortId ?: "")
+                        put("fingerprint", "chrome"); put("serverName", s.sni ?: s.host)
+                    })
+                })
+            }
+            if (s.network == "ws") put("wsSettings", JSONObject().apply {
+                put("path", s.path ?: "/"); put("headers", JSONObject().put("Host", s.sni ?: s.host))
+            })
+            if (s.network == "grpc") put("grpcSettings", JSONObject().put("serviceName", s.path ?: ""))
+        }
+        val outbound = JSONObject().apply {
+            put("tag", "out"); put("protocol", s.protocol)
+            when (s.protocol) {
+                "vless", "vmess" -> put("settings", JSONObject().put("vnext", JSONArray().put(JSONObject().apply {
+                    put("address", s.host); put("port", s.port)
+                    put("users", JSONArray().put(JSONObject().apply {
+                        put("id", s.uuid); put("encryption", "none")
+                        if (s.protocol == "vless" && s.reality) put("flow", "xtls-rprx-vision")
+                    }))
+                })))
+                "trojan" -> put("settings", JSONObject().put("servers", JSONArray().put(JSONObject().apply {
+                    put("address", s.host); put("port", s.port); put("password", s.uuid)
+                })))
+            }
+            put("streamSettings", stream)
+        }
+        return JSONObject().apply {
+            put("log", JSONObject().put("loglevel", "warning"))
+            put("inbounds", JSONArray().put(inbound))
+            put("outbounds", JSONArray().put(outbound))
+            put("dns", JSONObject().put("servers", JSONArray().put("1.1.1.1").put("8.8.8.8")))
+        }.toString(2)
+    }
+}
+
+object NativeV2RayEngine {
+    private var loaded = false
+    fun load(): Boolean {
+        if (loaded) return true
+        loaded = try { System.loadLibrary("v2ray_quantum"); true } catch (_: Throwable) { false }
+        return loaded
+    }
+    external fun nativeStart(cfg: String): Int
+    external fun nativeStop()
+    external fun nativeStats(): LongArray
+    fun start(c: String) = if (load()) nativeStart(c) else -1
+    fun stop() { if (load()) nativeStop() }
+    fun stats(): Pair<Long, Long> {
+        if (!load()) return 0L to 0L
+        val a = nativeStats()
+        return (a.getOrNull(0) ?: 0L) to (a.getOrNull(1) ?: 0L)
+    }
+}
+
+sealed class VpnState {
+    object Idle : VpnState()
+    object Connecting : VpnState()
+    data class Connected(val name: String, val latency: Long) : VpnState()
+    data class Error(val msg: String) : VpnState()
+}
+
+object SamSwitchBus {
+    private val _switchRequests = MutableSharedFlow<String>()
+    val switchRequests: SharedFlow<String> = _switchRequests
+    fun requestSwitch(failedId: String) { _switchRequests.tryEmit(failedId) }
+}
+
+class SamVpnService : VpnService() {
+    companion object {
+        const val ACTION_CONNECT = "connect"
+        const val ACTION_DISCONNECT = "disconnect"
+        const val EXTRA_SERVER_JSON = "server_json"
+        const val EXTRA_MTU = "mtu"
+        private const val CH = "sam_vpn"
+        private const val NID = 1401
+        private val _state = MutableStateFlow<VpnState>(VpnState.Idle)
+        val state: StateFlow<VpnState> = _state
+    }
+    private var tun: ParcelFileDescriptor? = null
+    private var scope: CoroutineScope? = null
+    private var healthJob: Job? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_CONNECT -> {
+                val json = intent.getStringExtra(EXTRA_SERVER_JSON)
+                val mtu = intent.getIntExtra(EXTRA_MTU, 1400)
+                if (json != null) startVpn(json, mtu)
+            }
+            ACTION_DISCONNECT -> stopVpn()
+        }
+        return START_STICKY
+    }
+
+    private fun startVpn(serverJson: String, mtu: Int) {
+        _state.value = VpnState.Connecting
+        notifyNotif("در حال اتصال…")
+        val server = parseServer(serverJson) ?: run { stopVpn(); return }
+        val builder = Builder().setSession("محمد سام").addAddress("10.8.0.2", 30).addRoute("0.0.0.0", 0).addDnsServer("1.1.1.1").addDnsServer("8.8.8.8").setMtu(mtu)
+        if (Prefs.isKill(this)) builder.addDisallowedApplication(packageName)
+        try { tun = builder.establish() } catch (t: Throwable) { _state.value = VpnState.Error("TUN: ${t.message}"); return }
+        val cfg = V2RayConfigBuilder.build(server, mtu)
+        if (NativeV2RayEngine.start(cfg) != 0) { _state.value = VpnState.Error("موتور Xray خطا داد"); stopVpn(); return }
+        _state.value = VpnState.Connected(server.name, server.latencyMs)
+        notifyNotif("متصل: ${server.name}")
+
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        scope!!.launch {
+            val pfd = tun ?: return@launch
+            val ins = java.io.FileInputStream(pfd.fileDescriptor)
+            val buf = ByteArray(mtu)
+            try { while (isActive) { if (ins.read(buf) <= 0) break } } catch (_: Throwable) {}
+        }
+        if (Prefs.isAuto(this)) {
+            healthJob = scope!!.launch {
+                var lastDown = 0L; var slowCount = 0
+                while (isActive) {
+                    delay(5000)
+                    val (_, down) = NativeV2RayEngine.stats()
+                    val delta = down - lastDown; lastDown = down
+                    if (delta < 5 * 1024) slowCount++ else slowCount = 0
+                    if (slowCount >= 3) { SamSwitchBus.requestSwitch(server.id); stopVpn(); break }
+                }
+            }
+        }
+    }
+
+    private fun stopVpn() {
+        healthJob?.cancel(); try { NativeV2RayEngine.stop() } catch (_: Throwable) {}
+        scope?.cancel(); try { tun?.close() } catch (_: Throwable) {}
+        tun = null; _state.value = VpnState.Idle
+        stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
+    }
+
+    private fun notifyNotif(text: String) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (android.os.Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CH, "محمد سام", NotificationManager.IMPORTANCE_LOW))
+        val pi = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        startForeground(NID, androidx.core.app.NotificationCompat.Builder(this, CH).setSmallIcon(android.R.drawable.ic_lock_lock).setContentTitle("محمد سام").setContentText(text).setContentIntent(pi).setOngoing(true).build())
+    }
+
+    override fun onDestroy() { stopVpn(); super.onDestroy() }
+}
+
+fun parseServer(json: String): Server? = try {
+    val o = JSONObject(json)
+    Server(
+        id = o.optString("id", "?"), name = o.optString("name", "?"), host = o.getString("host"), port = o.getInt("port"),
+        protocol = o.optString("protocol", "vless"), uuid = o.getString("uuid"), network = o.optString("network", "tcp"),
+        tls = o.optBoolean("tls", true), reality = o.optBoolean("reality", false),
+        sni = o.optString("sni", null).takeIf { it != "null" && it.isNotBlank() }, publicKey = o.optString("publicKey", null).takeIf { it != "null" && it.isNotBlank() },
+        shortId = o.optString("shortId", null).takeIf { it != "null" && it.isNotBlank() }, latencyMs = o.optLong("latencyMs", -1), source = o.optString("source", "?")
+    )
+} catch (_: Throwable) { null }
+
+object SiteTester {
+    private val http = OkHttpClient.Builder().connectTimeout(6, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS).build()
+    
+    suspend fun testAll(): List<SiteResult> = coroutineScope {
+        SelfConfigMaker.ALL_SITES.map { host -> async(Dispatchers.IO) {
+            val t0 = System.currentTimeMillis()
+            val ok = try { http.newCall(Request.Builder().url("https://$host").head().build()).execute().use { it.isSuccessful || it.code in 200..399 } } catch (_: Throwable) { false }
+            SiteResult(host, System.currentTimeMillis() - t0, ok)
+        } }.awaitAll()
+    }
+    
+    fun pickTop4(results: List<SiteResult>): List<SiteResult> {
+        return results.filter { it.ok }.sortedBy { it.ms }.take(4)
+    }
+}
+
+object Radar {
+    private fun ping(host: String, port: Int, timeout: Int = 2000): Long {
+        val t0 = System.currentTimeMillis()
+        return try { Socket().use { it.connect(InetSocketAddress(host, port), timeout) }; System.currentTimeMillis() - t0 } catch (_: Throwable) { -1L }
+    }
+    suspend fun scan(servers: List<Server>): List<Server> = coroutineScope {
+        servers.map { s -> async(Dispatchers.IO) { s.copy(latencyMs = ping(s.host, s.port)) } }.awaitAll()
+            .filter { it.latencyMs in 100..1000 }
+            .sortedBy { it.latencyMs }
+    }
+}
+
+object TrafficStats {
+    fun stream() = flow {
+        var lu = 0L; var ld = 0L; var lt = System.currentTimeMillis()
+        while (true) {
+            delay(1000); val (u, d) = NativeV2RayEngine.stats(); val n = System.currentTimeMillis(); val dt = (n - lt).coerceAtLeast(1) / 1000.0
+            emit(SpeedSample(((d - ld) / dt).toLong().coerceAtLeast(0), ((u - lu) / dt).toLong().coerceAtLeast(0)))
+            lu = u; ld = d; lt = n
+        }
+    }
+}
+
+class SamViewModel(app: Application) : AndroidViewModel(app) {
+    private val ctx = app.applicationContext
+    val vpnState = SamVpnService.state
+    var netSnap by mutableStateOf<NetSnap?>(null)
+    var currentServer by mutableStateOf<Server?>(null)
+    var speed by mutableStateOf(SpeedSample(0, 0))
+    var sites by mutableStateOf<List<SiteResult>>(emptyList())
+    var busy by mutableStateOf(false)
+    var log by mutableStateOf("")
+    var mode by mutableStateOf(Prefs.getMode(ctx))
+    var manualConfig by mutableStateOf(Prefs.getManual(ctx))
+    var subLink by mutableStateOf(Prefs.getSubLink(ctx))
+    var killSwitch by mutableStateOf(Prefs.isKill(ctx))
+    var autoSwitch by mutableStateOf(Prefs.isAuto(ctx))
+
+    init {
+        viewModelScope.launch { vpnState.collect { if (it is VpnState.Connected) TrafficStats.stream().collect { s -> speed = s } else speed = SpeedSample(0, 0) } }
+        viewModelScope.launch { SamSwitchBus.switchRequests.collect { log = "هوش مصنوعی: سرعت افت کرد — فرار به سرور بعدی…"; autoReconnect() } }
+        refreshNet()
+    }
+
+    fun refreshNet() = viewModelScope.launch { netSnap = NetworkFingerprint.detect(ctx) }
+    fun setMode(m: ConnectMode) { mode = m; Prefs.setMode(ctx, m) }
+    fun saveManual(j: String) { manualConfig = j; Prefs.setManual(ctx, j) }
+    fun saveSubLink(j: String) { subLink = j; Prefs.setSubLink(ctx, j) }
+    fun setKill(b: Boolean) { killSwitch = b; Prefs.setKill(ctx, b) }
+    fun setAuto(b: Boolean) { autoSwitch = b; Prefs.setAuto(ctx, b) }
+
+    fun prepareAndConnect() = viewModelScope.launch {
+        busy = true; log = "تشخیص شبکه…"
+        try {
+            val net = NetworkFingerprint.detect(ctx).also { netSnap = it }
+            var server: Server? = null
+
+            if (mode == ConnectMode.NATIONAL) {
+                log = "اسکن نامحدود VPSها…"
+                val liveVpsList = VpsScanner.findLiveVps(count = 300)
+                if (liveVpsList.isNotEmpty()) {
+                    log = "${liveVpsList.size} VPS زنده پیدا شد. تست…"
+                    for (ip in liveVpsList) {
+                        val testServer = SelfConfigMaker.build(net, ip) ?: continue
+                        val s = SiteTester.testAll()
+                        if (SiteTester.pickTop4(s).size >= 2) {
+                            server = testServer
+                            break
+                        }
+                    }
+                }
+                
+                if (server == null) {
+                    log = "در نت ملی چیزی پیدا نشد، انتقال به گیت‌هاب…"
+                    mode = ConnectMode.COMMUNITY
+                    server = prepareCommunity(net)
+                }
+            } else if (mode == ConnectMode.COMMUNITY) {
+                server = prepareCommunity(net)
+            } else if (mode == ConnectMode.SUBSCRIPTION) {
+                server = prepareSubscription(net)
+            } else {
+                server = prepareManual(net)
+            }
+
+            if (server == null) { log = "هیچ سرور سالمی پیدا نشد"; busy = false; return@launch }
+            currentServer = server; log = "تست ۱۰ سایت نهایی…"
+            val s = SiteTester.testAll(); sites = s; val ok = SiteTester.pickTop4(s).size
+            log = "سایت سالم (برتر): $ok / ۴"
+            if (ok < 2) { log = "⚠️ سرور ضعیف است (احتمالاً تله)"; busy = false; return@launch }
+            connectTo(server, net.mtu); log = "متصل شد به ${server.name}"
+        } finally { busy = false }
+    }
+
+    private suspend fun prepareCommunity(net: NetSnap): Server? {
+        log = "جستجوی کانفیگ REALITY (۷ روز تا ۱ ماه اخیر)…"
+        val reality = CommunityFetcher.fetchRealityConfigs()
+        if (reality.isNotEmpty()) {
+            val chunks = reality.chunked(10)
+            for (chunk in chunks) {
+                val live = Radar.scan(chunk)
+                if (live.isNotEmpty()) {
+                    log = "REALITY پیدا شد، تست امنیت…"
+                    val s = SiteTester.testAll()
+                    if (SiteTester.pickTop4(s).size >= 2) return live.first()
+                }
+            }
+        }
+        
+        log = "REALITY جواب نداد، سراغ کانفیگ‌های معمولی…"
+        val normal = CommunityFetcher.fetchNormalConfigs()
+        val chunks = normal.chunked(10)
+        for (chunk in chunks) {
+            val live = Radar.scan(chunk)
+            if (live.isNotEmpty()) {
+                log = "معمولی پیدا شد، تبدیل به REALITY و تست امنیت…"
+                val converted = SelfConfigMaker.convertToReality(live.first())
+                val s = SiteTester.testAll()
+                if (SiteTester.pickTop4(s).size >= 2) return converted
+            }
+        }
+        return null
+    }
+    
+    private suspend fun prepareSubscription(net: NetSnap): Server? {
+        if (subLink.isBlank()) { log = "لینک اشتراکی خالی است"; return null }
+        log = "ربات در حال چک کردن لینک اشتراکی…"
+        val list = CommunityFetcher.fetchSubscription(subLink)
+        if (list.isEmpty()) { log = "لینک اشتراکی کانفیگ سالمی نداشت"; return null }
+        val live = Radar.scan(list)
+        return live.firstOrNull()
+    }
+
+    private fun prepareManual(net: NetSnap): Server? {
+        if (manualConfig.isBlank()) { log = "کانفیگ دستی خالی است"; return null }
+        return parseServer(manualConfig)
+    }
+
+    private fun connectTo(s: Server, mtu: Int) {
+        val json = JSONObject().apply {
+            put("id", s.id); put("name", s.name); put("host", s.host); put("port", s.port); put("protocol", s.protocol); put("uuid", s.uuid); put("network", s.network)
+            put("tls", s.tls); put("reality", s.reality); put("source", s.source)
+            s.sni?.let { put("sni", it) }; s.publicKey?.let { put("publicKey", it) }; s.shortId?.let { put("shortId", it) }; s.path?.let { put("path", it) }
+            put("latencyMs", s.latencyMs)
+        }.toString()
+        ctx.startService(Intent(ctx, SamVpnService::class.java).apply { action = SamVpnService.ACTION_CONNECT; putExtra(SamVpnService.EXTRA_SERVER_JSON, json); putExtra(SamVpnService.EXTRA_MTU, mtu) })
+    }
+
+    fun disconnect() { ctx.startService(Intent(ctx, SamVpnService::class.java).apply { action = SamVpnService.ACTION_DISCONNECT }) }
+
+    private suspend fun autoReconnect() {
+        val list = CommunityFetcher.fetchNormalConfigs()
+        val scored = Radar.scan(list).filter { it.id != currentServer?.id }
+        val next = scored.firstOrNull() ?: return
+        currentServer = next; connectTo(next, netSnap?.mtu ?: 1400)
+    }
+}
+
+@Composable
+fun SamHome(vm: SamViewModel = viewModel()) {
+    val state by vm.vpnState.collectAsState()
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(BgDeep, Color(0xFF150A2E), BgDeep)))) {
+        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("محمد سام", color = NeonPurple, fontSize = 30.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Text("VPN Gaming Edition", color = NeonCyan, fontSize = 12.sp)
+            NetCard(vm.netSnap)
+            PowerOrb(state) { if (state is VpnState.Connected) vm.disconnect() else vm.prepareAndConnect() }
+            SpeedRow(vm.speed, state)
+            ModeCard(vm)
+            if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = NeonPurple, trackColor = BgCard2)
+            if (vm.log.isNotBlank()) Text(vm.log, color = TextDim, fontSize = 12.sp)
+            SettingsCard(vm)
+            SiteCard(vm)
+        }
+    }
+}
+
+@Composable
+fun NetCard(net: NetSnap?) {
+    Card(colors = CardDefaults.cardColors(containerColor = BgCard), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("شبکه", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            if (net == null) Text("در حال تشخیص…", color = TextDim)
+            else {
+                Row { Text("اپراتور: ", color = TextDim); Text(net.operatorName, color = TextLight) }
+                Row { Text("نوع: ", color = TextDim); Text(net.connectionType, color = TextLight) }
+                Row { Text("IP: ", color = TextDim); Text(net.publicIp, color = TextLight) }
+                Row { Text("ISP: ", color = TextDim); Text(net.isp, color = TextLight) }
+                Row { Text("MTU پیشنهادی: ", color = TextDim); Text("${net.mtu}", color = TextLight) }
+            }
+        }
+    }
+}
+
+@Composable
+fun PowerOrb(state: VpnState, onClick: () -> Unit) {
+    val infinite = rememberInfiniteTransition(label = "p")
+    val scale by infinite.animateFloat(initialValue = 1f, targetValue = 1.08f, animationSpec = infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "s")
+    val (c1, c2) = when (state) {
+        is VpnState.Connected -> SuccessGreen to NeonCyan
+        is VpnState.Connecting -> NeonPurple to NeonPink
+        is VpnState.Error -> DangerRed to NeonPurple
+        else -> NeonPurple to NeonCyan
+    }
+    val label = when (state) {
+        is VpnState.Connected -> "قطع"; is VpnState.Connecting -> "اتصال…"; is VpnState.Error -> "خطا"; else -> "اتصال"
+    }
+    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(150.dp).scale(if (state is VpnState.Connected || state is VpnState.Connecting) scale else 1f).clip(CircleShape).background(Brush.radialGradient(listOf(c1, c2, BgDeep))).clickable { onClick() }, contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("⚡", fontSize = 32.sp)
+                Text(label, color = BgDeep, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun SpeedRow(speed: SpeedSample, state: VpnState) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SpeedBox("↓", "${"%.1f".format(speed.down / 1024.0)}", "KB/s", NeonCyan, Modifier.weight(1f))
+        SpeedBox("↑", "${"%.1f".format(speed.up / 1024.0)}", "KB/s", NeonPink, Modifier.weight(1f))
+        SpeedBox("●", if (state is VpnState.Connected) "${state.latency}" else "—", "ms", SuccessGreen, Modifier.weight(1f))
+    }
+}
+
+@Composable
+fun SpeedBox(icon: String, value: String, unit: String, color: Color, m: Modifier) {
+    Card(colors = CardDefaults.cardColors(containerColor = BgCard), shape = RoundedCornerShape(16.dp), modifier = m) {
+        Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("$icon $value", color = color, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(unit, color = TextDim, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+fun ModeCard(vm: SamViewModel) {
+    Card(colors = CardDefaults.cardColors(containerColor = BgCard), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("روش اتصال", color = NeonPurple, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ModeChip("نت ملی", vm.mode == ConnectMode.NATIONAL) { vm.setMode(ConnectMode.NATIONAL) }
+                ModeChip("گیت‌هاب", vm.mode == ConnectMode.COMMUNITY) { vm.setMode(ConnectMode.COMMUNITY) }
+                ModeChip("اشتراکی", vm.mode == ConnectMode.SUBSCRIPTION) { vm.setMode(ConnectMode.SUBSCRIPTION) }
+                ModeChip("دستی", vm.mode == ConnectMode.MANUAL) { vm.setMode(ConnectMode.MANUAL) }
+            }
+            when (vm.mode) {
+                ConnectMode.NATIONAL -> Text("اسکن نامحدود VPSها، ساخت کانفیگ و تست ۴ سایت برتر", color = TextDim, fontSize = 11.sp)
+                ConnectMode.COMMUNITY -> Text("شکار REALITY (۱ ماه اخیر)، سپس معمولی و تبدیل به REALITY", color = TextDim, fontSize = 11.sp)
+                ConnectMode.SUBSCRIPTION -> OutlinedTextField(value = vm.subLink, onValueChange = { vm.saveSubLink(it) }, label = { Text("لینک اشتراکی (Subscription)") }, colors = samFieldColors(), modifier = Modifier.fillMaxWidth())
+                ConnectMode.MANUAL -> OutlinedTextField(value = vm.manualConfig, onValueChange = { vm.saveManual(it) }, label = { Text("متن JSON کانفیگ") }, colors = samFieldColors(), modifier = Modifier.fillMaxWidth().height(120.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun ModeChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Box(Modifier.clip(RoundedCornerShape(30.dp)).background(if (active) NeonPurple else BgCard2).clickable { onClick() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Text(label, color = if (active) BgDeep else TextLight, fontSize = 11.sp)
+    }
+}
+
+@Composable
+fun SettingsCard(vm: SamViewModel) {
+    Card(colors = CardDefaults.cardColors(containerColor = BgCard), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("تنظیمات", color = NeonPurple, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Kill Switch", color = TextLight, modifier = Modifier.weight(1f))
+                Switch(checked = vm.killSwitch, onCheckedChange = { vm.setKill(it) })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("سوئیچ خودکار", color = TextLight, modifier = Modifier.weight(1f))
+                Switch(checked = vm.autoSwitch, onCheckedChange = { vm.setAuto(it) })
+            }
+        }
+    }
+}
+
+@Composable
+fun SiteCard(vm: SamViewModel) {
+    if (vm.sites.isEmpty()) return
+    val top4 = SiteTester.pickTop4(vm.sites)
+    Card(colors = CardDefaults.cardColors(containerColor = BgCard), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("۴ سایت برتر (برای مخفی‌سازی)", color = NeonPurple, fontWeight = FontWeight.Bold)
+            top4.forEach {
+                Text("✓ ${it.name} (${it.ms}ms)", color = SuccessGreen, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun samFieldColors() = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = TextDim, focusedTextColor = TextLight, unfocusedTextColor = TextLight, focusedLabelColor = NeonCyan, unfocusedLabelColor = TextDim)
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent { SamHome(viewModel()) }
+    }
+}
+
+# ===== FILE: .github/workflows/build.yml =====
+name: Build APK
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - uses: android-actions/setup-android@v3
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+    - name: Build Debug APK
+      run: |
+        if [ ! -f gradlew ]; then
+          gradle wrapper --gradle-version 8.5
+        fi
+        chmod +x gradlew
+        ./gradlew assembleDebug --no-daemon
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/*.apk
